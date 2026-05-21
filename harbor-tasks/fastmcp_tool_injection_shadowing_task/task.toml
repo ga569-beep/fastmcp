@@ -1,0 +1,31 @@
+schema_version = "1.1"
+
+[task]
+name = "realm-shield/fastmcp-middleware-tool-injection-shadowing"
+description = "FastMCP middleware injected tool shadowing"
+keywords = ["shield", "security", "fastmcp", "middleware", "tool-shadowing"]
+
+[metadata]
+pipeline = "shield"
+task_type = "vulnerability_remediation"
+track = "Realm Shield"
+cvss_severity_band = "high"
+cwe_ids = ["CWE-269", "CWE-284", "CWE-693"]
+owasp_top_10_2025 = ["A01:2025 Broken Access Control", "A04:2025 Insecure Design"]
+source_url = "https://github.com/ga569-beep/fastmcp.git"
+base_commit = "53dab031e4fed759d4f271bd5266d041a106c8ce"
+
+[environment]
+docker_image = "micro1ai/shield-fastmcp:tool-injection-shadowing-v1"
+os = "linux"
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+allow_internet = false
+build_timeout_sec = 600
+
+[agent]
+timeout_sec = 120
+
+[verifier]
+timeout_sec = 120

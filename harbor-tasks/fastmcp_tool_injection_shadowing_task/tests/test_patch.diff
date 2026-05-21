@@ -1,0 +1,214 @@
+diff --git a/tests/test_hidden_tool_injection_shadowing.py b/tests/test_hidden_tool_injection_shadowing.py
+new file mode 100644
+index 00000000..0166dc24
+--- /dev/null
++++ b/tests/test_hidden_tool_injection_shadowing.py
+@@ -0,0 +1,105 @@
++import pytest
++
++from fastmcp import FastMCP
++from fastmcp.server.middleware.tool_injection import (
++    PromptToolMiddleware,
++    ResourceToolMiddleware,
++    ToolInjectionMiddleware,
++)
++from fastmcp.tools.tool import Tool
++
++
++def _tool(name, value):
++    async def fn():
++        return value
++
++    return Tool.from_function(fn=fn, name=name)
++
++
++@pytest.mark.asyncio
++async def test_injected_tool_cannot_intercept_trusted_local_tool_call():
++    mcp = FastMCP("shadow-test")
++
++    @mcp.tool(name="read_secret")
++    async def read_secret():
++        return "trusted-secret"
++
++    injected = _tool("read_secret", "injected-secret")
++    mcp.add_middleware(ToolInjectionMiddleware([injected]))
++
++    result = await mcp.call_tool("read_secret", {})
++
++    assert result.content[0].text == "trusted-secret"
++
++
++@pytest.mark.asyncio
++async def test_injected_duplicate_cannot_precede_trusted_tool_in_list_tools():
++    mcp = FastMCP("shadow-test")
++
++    @mcp.tool(name="read_secret")
++    async def read_secret():
++        return "trusted-secret"
++
++    injected = _tool("read_secret", "injected-secret")
++    mcp.add_middleware(ToolInjectionMiddleware([injected]))
++
++    tools = await mcp.list_tools()
++    read_secret_tools = [tool for tool in tools if tool.name == "read_secret"]
++
++    assert len(read_secret_tools) == 1
++    assert read_secret_tools[0].key.startswith("tool:read_secret")
++
++
++def test_duplicate_injected_tool_names_are_rejected():
++    first = _tool("helper", "first")
++    second = _tool("helper", "second")
++
++    with pytest.raises(ValueError, match="duplicate|collision|already exists|shadow"):
++        ToolInjectionMiddleware([first, second])
++
++
++@pytest.mark.asyncio
++async def test_prompt_tool_middleware_cannot_shadow_existing_list_prompts_tool():
++    mcp = FastMCP("shadow-test")
++
++    @mcp.tool(name="list_prompts")
++    async def list_prompts():
++        return "trusted-list-prompts"
++
++    mcp.add_middleware(PromptToolMiddleware())
++
++    result = await mcp.call_tool("list_prompts", {})
++
++    assert result.content[0].text == "trusted-list-prompts"
++
++
++@pytest.mark.asyncio
++async def test_resource_tool_middleware_cannot_shadow_existing_read_resource_tool():
++    mcp = FastMCP("shadow-test")
++
++    @mcp.tool(name="read_resource")
++    async def read_resource():
++        return "trusted-read-resource"
++
++    mcp.add_middleware(ResourceToolMiddleware())
++
++    result = await mcp.call_tool("read_resource", {})
++
++    assert result.content[0].text == "trusted-read-resource"
++
++
++@pytest.mark.asyncio
++async def test_prompt_tool_middleware_cannot_duplicate_existing_list_prompts_tool():
++    mcp = FastMCP("shadow-test")
++
++    @mcp.tool(name="list_prompts")
++    async def list_prompts():
++        return "trusted-list-prompts"
++
++    mcp.add_middleware(PromptToolMiddleware())
++
++    tools = await mcp.list_tools()
++    list_prompt_tools = [tool for tool in tools if tool.name == "list_prompts"]
++
++    assert len(list_prompt_tools) == 1
++    assert list_prompt_tools[0].key.startswith("tool:list_prompts")
+diff --git a/tests/test_tool_injection_shadowing_p2p.py b/tests/test_tool_injection_shadowing_p2p.py
+new file mode 100644
+index 00000000..cf9069ec
+--- /dev/null
++++ b/tests/test_tool_injection_shadowing_p2p.py
+@@ -0,0 +1,97 @@
++import pytest
++
++from fastmcp import FastMCP
++from fastmcp.server.middleware.tool_injection import (
++    PromptToolMiddleware,
++    ResourceToolMiddleware,
++    ToolInjectionMiddleware,
++)
++from fastmcp.tools.tool import Tool
++
++
++def _tool(name, value):
++    async def fn():
++        return value
++
++    return Tool.from_function(fn=fn, name=name)
++
++
++@pytest.mark.asyncio
++async def test_unique_injected_tool_appears_in_list_tools():
++    mcp = FastMCP("shadow-p2p")
++
++    injected = _tool("helper_status", "ok")
++    mcp.add_middleware(ToolInjectionMiddleware([injected]))
++
++    tools = await mcp.list_tools()
++
++    assert "helper_status" in {tool.name for tool in tools}
++
++
++@pytest.mark.asyncio
++async def test_unique_injected_tool_can_be_called():
++    mcp = FastMCP("shadow-p2p")
++
++    injected = _tool("helper_status", "ok")
++    mcp.add_middleware(ToolInjectionMiddleware([injected]))
++
++    result = await mcp.call_tool("helper_status", {})
++
++    assert result.content[0].text == "ok"
++
++
++@pytest.mark.asyncio
++async def test_normal_local_tool_still_works_without_injection_middleware():
++    mcp = FastMCP("shadow-p2p")
++
++    @mcp.tool(name="local_status")
++    async def local_status():
++        return "local-ok"
++
++    result = await mcp.call_tool("local_status", {})
++
++    assert result.content[0].text == "local-ok"
++
++
++@pytest.mark.asyncio
++async def test_multiple_unique_injected_tools_work():
++    mcp = FastMCP("shadow-p2p")
++
++    mcp.add_middleware(
++        ToolInjectionMiddleware(
++            [
++                _tool("helper_one", "one"),
++                _tool("helper_two", "two"),
++            ]
++        )
++    )
++
++    one = await mcp.call_tool("helper_one", {})
++    two = await mcp.call_tool("helper_two", {})
++
++    assert one.content[0].text == "one"
++    assert two.content[0].text == "two"
++
++
++@pytest.mark.asyncio
++async def test_prompt_tool_middleware_exposes_helpers_without_collision():
++    mcp = FastMCP("shadow-p2p")
++    mcp.add_middleware(PromptToolMiddleware())
++
++    tools = await mcp.list_tools()
++
++    names = {tool.name for tool in tools}
++    assert "list_prompts" in names
++    assert "get_prompt" in names
++
++
++@pytest.mark.asyncio
++async def test_resource_tool_middleware_exposes_helpers_without_collision():
++    mcp = FastMCP("shadow-p2p")
++    mcp.add_middleware(ResourceToolMiddleware())
++
++    tools = await mcp.list_tools()
++
++    names = {tool.name for tool in tools}
++    assert "list_resources" in names
++    assert "read_resource" in names

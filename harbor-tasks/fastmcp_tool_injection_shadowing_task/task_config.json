@@ -1,0 +1,47 @@
+{
+  "instance_id": "fastmcp__middleware_tool_injection_shadowing_001",
+  "pipeline": "shield",
+  "task_type": "vulnerability_remediation",
+  "repo": {
+    "source_url": "https://github.com/ga569-beep/fastmcp.git",
+    "base_commit": "53dab031e4fed759d4f271bd5266d041a106c8ce",
+    "image_name": "micro1ai/shield-fastmcp:tool-injection-shadowing-v1",
+    "repo_dir": "/repo",
+    "language": "python",
+    "image_digest": "8b0979a61f9840281c375a622916d5a188a845927875352bcd147540b9d98280"
+  },
+  "title": "FastMCP middleware injected tool shadowing",
+  "track": "Realm Shield",
+  "owasp_top_10_2025": [
+    "A01:2025 Broken Access Control",
+    "A04:2025 Insecure Design"
+  ],
+  "cwe_ids": [
+    "CWE-269",
+    "CWE-284",
+    "CWE-693"
+  ],
+  "cvss_severity_band": "high",
+  "test_cmd": "echo USING_FASTMCP_TOOL_INJECTION_SHADOWING_V1; cd /repo && python -m pytest tests/test_hidden_tool_injection_shadowing.py tests/test_tool_injection_shadowing_p2p.py --no-header -rA --tb=short --color=no -p no:cacheprovider",
+  "log_parser": "parse_log_pytest",
+  "FAIL_TO_PASS": [
+    "tests/test_hidden_tool_injection_shadowing.py::test_injected_tool_cannot_intercept_trusted_local_tool_call",
+    "tests/test_hidden_tool_injection_shadowing.py::test_injected_duplicate_cannot_precede_trusted_tool_in_list_tools",
+    "tests/test_hidden_tool_injection_shadowing.py::test_duplicate_injected_tool_names_are_rejected",
+    "tests/test_hidden_tool_injection_shadowing.py::test_prompt_tool_middleware_cannot_shadow_existing_list_prompts_tool",
+    "tests/test_hidden_tool_injection_shadowing.py::test_resource_tool_middleware_cannot_shadow_existing_read_resource_tool",
+    "tests/test_hidden_tool_injection_shadowing.py::test_prompt_tool_middleware_cannot_duplicate_existing_list_prompts_tool"
+  ],
+  "PASS_TO_PASS": [
+    "tests/test_tool_injection_shadowing_p2p.py::test_unique_injected_tool_appears_in_list_tools",
+    "tests/test_tool_injection_shadowing_p2p.py::test_unique_injected_tool_can_be_called",
+    "tests/test_tool_injection_shadowing_p2p.py::test_normal_local_tool_still_works_without_injection_middleware",
+    "tests/test_tool_injection_shadowing_p2p.py::test_multiple_unique_injected_tools_work",
+    "tests/test_tool_injection_shadowing_p2p.py::test_prompt_tool_middleware_exposes_helpers_without_collision",
+    "tests/test_tool_injection_shadowing_p2p.py::test_resource_tool_middleware_exposes_helpers_without_collision"
+  ],
+  "hidden_test_patch": "test_patch.diff",
+  "golden_patch": "gold_patch.diff",
+  "behavioral_prompt": "prompt.txt",
+  "reasoning": "reasoning.txt"
+}

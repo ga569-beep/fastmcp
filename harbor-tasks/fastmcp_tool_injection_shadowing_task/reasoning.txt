@@ -1,0 +1,23 @@
+Attack Vector
+
+FastMCP supports middleware that can dynamically expose helper tools. ToolInjectionMiddleware injects additional tools into list_tools() and intercepts call_tool() requests by tool name before the server's normal provider lookup runs.
+
+If an injected tool has the same name as an existing trusted server tool, the injected tool can take precedence. This creates a tool shadowing issue: clients see or call a tool name that should resolve to the trusted server operation, but the middleware can return or execute the injected operation instead.
+
+This also affects built-in helper middleware such as PromptToolMiddleware and ResourceToolMiddleware, which expose helper tools like list_prompts, get_prompt, list_resources, and read_resource. If an application already defines trusted tools with those names, the helper middleware can shadow them.
+
+Root Cause
+
+ToolInjectionMiddleware stores injected tools in a dict keyed only by tool.name. It does not reject duplicate injected names. Its list_tools hook prepends injected tools before the server's existing tools. Its call_tool hook checks the injected name map first and executes the injected tool without first checking whether a trusted server tool with the same name exists.
+
+Fix Rationale
+
+Injected helper tools should not silently take precedence over existing server operations. Duplicate names inside a single injection middleware should be rejected. When listing tools, injected tools that collide with existing server tools should be omitted or otherwise prevented from shadowing the trusted tool. When calling a tool, the server's normal tool lookup should take priority; the injected fallback should only run when the server does not have a matching tool.
+
+Incorrect Fixes
+
+1. Only changing list_tools order is incomplete because call_tool can still execute the injected duplicate.
+2. Only changing call_tool is incomplete because the client-visible tool catalog can still be poisoned by duplicate injected tools.
+3. Ignoring duplicate injected names silently is unsafe because the last value in the dict wins without an explicit decision.
+4. Renaming only PromptToolMiddleware or ResourceToolMiddleware is incomplete because generic ToolInjectionMiddleware remains vulnerable.
+5. Disabling all helper middleware breaks legitimate injected tools and does not preserve normal behavior.
